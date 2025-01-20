@@ -1,125 +1,86 @@
 <template>
-  <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-    <h2 class="text-2xl font-bold text-gray-800 mb-6">{{ isEditing ? 'Editar Filme' : 'Adicionar Filme' }}</h2>
-    <form @submit.prevent="submitForm" class="space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <label for="titulo" class="block text-sm font-medium text-gray-700">Título</label>
-          <input
-              type="text"
-              id="titulo"
-              v-model="form.titulo"
-              required
-              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          >
-        </div>
-        <div class="space-y-2">
-          <label for="genero" class="block text-sm font-medium text-gray-700">Gênero</label>
-          <input
-              type="text"
-              id="genero"
-              v-model="form.genero"
-              required
-              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          >
-        </div>
-        <div class="space-y-2">
-          <label for="anoLancamento" class="block text-sm font-medium text-gray-700">Ano de Lançamento</label>
-          <input
-              type="number"
-              id="anoLancamento"
-              v-model="form.anoLancamento"
-              required
-              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          >
-        </div>
-        <div class="space-y-2">
-          <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-          <select
-              id="status"
-              v-model="form.status"
-              required
-              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          >
-            <option value="disponível">Disponível</option>
-            <option value="alugado">Alugado</option>
-          </select>
-        </div>
-      </div>
-      <div class="flex justify-end mt-6">
-        <button
-            type="submit"
-            :disabled="loading"
-            class="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
-        >
-          {{ isEditing ? 'Atualizar' : 'Adicionar' }}
-        </button>
-      </div>
-    </form>
+  <div>
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">Lista de Filmes</h2>
+      <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+      Total: {{ filmes.length }} filmes
+    </span>
+    </div>
+
+    <div v-if="loading" class="flex justify-center items-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+    </div>
+
+    <div v-else-if="filmes.length === 0" class="bg-gray-50 dark:bg-gray-700 rounded-xl p-12 text-center">
+      <Film class="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Nenhum filme cadastrado</h3>
+      <p class="text-gray-500 dark:text-gray-400">Adicione um novo filme usando o formulário acima.</p>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <FilmeCard
+          v-for="filme in filmes"
+          :key="filme.id"
+          :filme="filme"
+          @delete="deleteFilme"
+          @edit="editFilme"
+      />
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
 import api from '@/services/api'
+import FilmeCard from './molecules/FilmeCard.vue'
+import { Film } from 'lucide-vue-next'
 
 export default {
-  name: 'FilmeForm',
-  props: {
-    filmeId: {
-      type: Number,
-      default: null
-    }
+  name: 'FilmeList',
+  components: {
+    FilmeCard,
+    Film
   },
-  setup(props, { emit }) {
-    const form = ref({
-      titulo: '',
-      genero: '',
-      anoLancamento: null,
-      status: 'disponível'
-    })
-    const isEditing = ref(false)
-    const loading = ref(false)
+  setup() {
+    const filmes = ref([])
+    const loading = ref(true)
 
-    onMounted(async () => {
-      if (props.filmeId) {
-        isEditing.value = true
-        try {
-          const response = await api.get(`/filmes/${props.filmeId}`)
-          form.value = response.data
-        } catch (error) {
-          console.error('Erro ao buscar filme:', error)
-        }
-      }
-    })
-
-    const submitForm = async () => {
+    const fetchFilmes = async () => {
       try {
         loading.value = true
-        if (isEditing.value) {
-          await api.put(`/filmes/${props.filmeId}`, form.value)
-        } else {
-          await api.post('/filmes', form.value)
-        }
-        form.value = {
-          titulo: '',
-          genero: '',
-          anoLancamento: null,
-          status: 'disponível'
-        }
-        emit('submitted')
+        const response = await api.get('/filmes')
+        filmes.value = response.data
       } catch (error) {
-        console.error('Erro ao salvar filme:', error)
+        console.error('Erro ao buscar filmes:', error)
       } finally {
         loading.value = false
       }
     }
 
+    const deleteFilme = async (id) => {
+      if (confirm('Tem certeza que deseja excluir este filme?')) {
+        try {
+          await api.delete(`/filmes/${id}`)
+          filmes.value = filmes.value.filter(filme => filme.id !== id)
+        } catch (error) {
+          console.error('Erro ao deletar filme:', error)
+        }
+      }
+    }
+
+    const editFilme = (id) => {
+      // Implement edit functionality
+      console.log('Editar filme:', id)
+    }
+
+    onMounted(fetchFilmes)
+
     return {
-      form,
-      isEditing,
+      filmes,
       loading,
-      submitForm
+      deleteFilme,
+      editFilme,
+      fetchFilmes
     }
   }
 }
